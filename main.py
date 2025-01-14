@@ -1,52 +1,30 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import requests
-import json
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import sqlite3
 from ttkthemes import ThemedTk
-import bcrypt
+from auth.login import login
+from auth.register import signup
+from config.firebase_config import cred
+from firebase_admin import initialize_app, firestore
 
 class CurrencyConverter:
     def __init__(self):
         self.root = ThemedTk(theme="arc")
         self.root.title("Currency Converter Pro")
-        self.root.geometry("800x600")
+        self.root.geometry("800x600") 
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         
-        # Database initialization
-        self.init_database()
+        # Firebase initialization
+        initialize_app(cred)
         
+        #Firestore initialization
+        self.db = firestore.client()
+               
         # Show login page first
         self.show_login_page()
-        
-    def init_database(self):
-        self.conn = sqlite3.connect('db_for_cc.db')
-        self.cursor = self.conn.cursor()
-        
-        # Create users table
-        self.cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password TEXT
-        )
-        ''')
-        
-        # Create conversion history table
-        self.cursor.execute('''
-        CREATE TABLE IF NOT EXISTS conversion_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
-            from_currency TEXT,
-            to_currency TEXT,
-            amount REAL,
-            converted_amount REAL,
-            date TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(username)
-        )
-        ''')
-        self.conn.commit()
 
     def show_login_page(self):
         self.login_frame = ttk.Frame(self.root, padding="20")
@@ -54,60 +32,74 @@ class CurrencyConverter:
         
         ttk.Label(self.login_frame, text="Currency Converter Pro", font=('Helvetica', 16, 'bold')).grid(row=0, column=0, columnspan=2, pady=20)
         
-        ttk.Label(self.login_frame, text="Username:").grid(row=1, column=0, pady=5)
-        self.username_entry = ttk.Entry(self.login_frame)
-        self.username_entry.grid(row=1, column=1, pady=5)
+        ttk.Label(self.login_frame, text="Email:").grid(row=1, column=0, pady=5, sticky='w')
+        self.email_entry_login = ttk.Entry(self.login_frame)
+        self.email_entry_login.grid(row=1, column=1, pady=5)
         
-        ttk.Label(self.login_frame, text="Password:").grid(row=2, column=0, pady=5)
-        self.password_entry = ttk.Entry(self.login_frame, show="*")
-        self.password_entry.grid(row=2, column=1, pady=5)
+        ttk.Label(self.login_frame, text="Password:").grid(row=2, column=0, pady=5, sticky='w')
+        self.password_entry_login = ttk.Entry(self.login_frame, show="*")
+        self.password_entry_login.grid(row=2, column=1, pady=5)
         
-        ttk.Button(self.login_frame, text="Login", command=self.login).grid(row=3, column=0, pady=20)
-        ttk.Button(self.login_frame, text="Register", command=self.register).grid(row=3, column=1, pady=20)
-
-    def login(self):
-        self.username = self.username_entry.get()
-        self.password = self.password_entry.get()
+        ttk.Button(self.login_frame, text="Login", command=lambda: self.login(self.email_entry_login.get(), self.password_entry_login.get())).grid(row=3, column=0, pady=20)
+        ttk.Button(self.login_frame, text="Register", command=self.show_signup_page).grid(row=3, column=1, pady=20)
+    
+    def show_signup_page(self):
+        self.signup_frame = ttk.Frame(self.root, padding="20")
+        self.signup_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        self.cursor.execute('SELECT password FROM users WHERE username=?', (self.username,))
-        result = self.cursor.fetchone()
+        ttk.Label(self.signup_frame, text="Currency Converter Pro", font=('Helvetica', 16, 'bold')).grid(row=0, column=0, columnspan=2, pady=20)
         
-        if result and bcrypt.checkpw(self.password.encode('utf-8'), result[0]):
-            self.current_user = self.username
-            self.login_frame.destroy()
-            self.show_main_application()
-
-            self.cursor.execute(f"SELECT * FROM user_{self.username} ORDER BY date DESC")
-            rows = self.cursor.fetchall()
-
-            for row in rows:
-                self.history_tree.insert("", tk.END, values=row)
-
-        else:
-            messagebox.showerror("Error", "Invalid username or password")
-
-    def register(self):
-        self.username = self.username_entry.get()
-        self.password = self.password_entry.get()
+        ttk.Label(self.signup_frame, text="Email:").grid(row=1, column=0, pady=5, sticky='w')
+        self.email_entry_signup = ttk.Entry(self.signup_frame)
+        self.email_entry_signup.grid(row=1, column=1, pady=5)
         
-        if self.username and self.password:
-            hashed_password = bcrypt.hashpw(self.password.encode('utf-8'), bcrypt.gensalt())
-            try:
-                self.cursor.execute('INSERT INTO users VALUES (?, ?)', (self.username, hashed_password))
-                self.conn.commit()
-                query=f'''CREATE TABLE IF NOT EXISTS user_{self.username} (date TIMESTAMP,
-                    from_currency TEXT,
-                    to_currency TEXT,
-                    amount REAL,
-                    converted_amount REAL
-                    )'''
-                self.cursor.execute(query)
-                messagebox.showinfo("Success", "Registration successful!")
-            except sqlite3.IntegrityError:
-                messagebox.showerror("Error", "Username already exists")
-        else:
-            messagebox.showerror("Error", "Please fill all fields")
-
+        ttk.Label(self.signup_frame, text="Password:").grid(row=2, column=0, pady=5, sticky='w')
+        self.password_entry_signup = ttk.Entry(self.signup_frame, show="*")
+        self.password_entry_signup.grid(row=2, column=1, pady=5)
+        
+        ttk.Label(self.signup_frame, text="Confirm Password:").grid(row=3, column=0, pady=5, sticky='w')
+        self.confirm_password_entry_signup = ttk.Entry(self.signup_frame, show="*")
+        self.confirm_password_entry_signup.grid(row=3, column=1, pady=5)
+        
+        ttk.Button(self.signup_frame, text="Register", command=lambda: self.signup(self.email_entry_signup.get(), self.password_entry_signup.get(), self.confirm_password_entry_signup.get())).grid(row=4, column=0, pady=40)
+        ttk.Button(self.signup_frame, text="Login", command=self.show_login_page).grid(row=4, column=1, pady=40)
+    
+    def login(self, email, password):
+            self.user = login(email, password)
+            if self.user:
+                if self.user == 'INVALID_EMAIL':
+                    messagebox.showerror("Error", "Email Address is invalid")
+                elif self.user == 'MISSING_PASSWORD':
+                    messagebox.showerror("Error", "Please enter your password")
+                elif self.user == 'INVALID_LOGIN_CREDENTIALS': 
+                    messagebox.showerror("Error", "Invalid Password")
+                else:
+                    self.doc_ref = self.db.collection("users").document(self.user['localId']).collection('history')
+                    docs = self.doc_ref.stream()
+                    self.entries_array = [{"id": doc.id, **doc.to_dict()} for doc in docs]
+                    self.show_main_application()
+    
+    def signup(self, email, password, confirm_password):
+        if password and confirm_password: 
+            if password == confirm_password: 
+                self.user = signup(email, password)
+                if self.user:
+                    if self.user == 'EMAIL_EXITS':
+                        messagebox.showerror("Error", "Email Already Exists")
+                    elif self.user == 'WEAK_PASSWORD':
+                        messagebox.showerror("Error", "Password must be at least 6 characters")
+                    elif self.user == 'INVALID_EMAIL':
+                        messagebox.showerror("Error", "Enter a valid email address")
+                    else:
+                        self.doc_ref = self.db.collection("users").document(self.user['localId']).collection('history')
+                        docs = self.doc_ref.stream()
+                        self.entries_array = [{"id": doc.id, **doc.to_dict()} for doc in docs]
+                        self.show_main_application()
+            else: 
+                messagebox.showerror("Error", "Password does not match")
+        else: 
+            messagebox.showerror("Error", "Please enter confirm password")
+        
     def show_main_application(self):
         self.main_frame = ttk.Frame(self.root, padding="20")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -181,6 +173,8 @@ class CurrencyConverter:
         self.history_tree.heading('Amount', text='Amount')
         self.history_tree.heading('Converted', text='Converted')
         self.history_tree.grid(row=0, column=0, pady=5)
+        for item in self.entries_array:
+            self.history_tree.insert("", tk.END, values=tuple([item['time_created'], item['from'], item['to'], item['amount'], item['converted_amount']]))
 
     def create_graph_widget(self):
         self.graph_frame = ttk.LabelFrame(self.main_frame, text="Exchange Rate Trends", padding="10")
@@ -212,12 +206,13 @@ class CurrencyConverter:
             self.result_label.config(text=f"{amount} {from_curr} = {converted_amount:.2f} {to_curr}")
             
             # Save to history
-            self.save_to_history(from_curr, to_curr, amount, converted_amount,self.username)
+            self.save_to_history(from_curr, to_curr, amount, converted_amount)
             
             # Update graph
             self.update_graph()
             
-        except ValueError:
+        except Exception as e:
+            print(e)
             messagebox.showerror("Error", "Please enter a valid amount")
 
     def get_exchange_rate(self, from_curr, to_curr):
@@ -225,29 +220,26 @@ class CurrencyConverter:
         rate=self.data[to_curr]/self.data[from_curr]
         return rate
 
-    def save_to_history(self,from_curr, to_curr, amount, converted_amount,username):
+    def save_to_history(self,from_curr, to_curr, amount, converted_amount):
         current_time = datetime.now()
         current_time=current_time.strftime('%Y-%m-%d %H:%M:%S')
         
+        data = {
+            "time_created": current_time,
+            "from": from_curr,
+            "to": to_curr,
+            "amount": amount,
+            "converted_amount": converted_amount
+        }
         # Save to database
-        query=f'''INSERT INTO user_{username} (date,from_currency,to_currency,amount,converted_amount)
-        VALUES (?, ?, ?, ?, ?)'''
-        self.cursor.execute(query, (str(current_time),from_curr, to_curr, amount, converted_amount))
-        self.conn.commit()
+        doc_ref = self.doc_ref.add(data)
+        doc_id = doc_ref[1].id
+        new_entry = data.copy()
+        new_entry["id"] = doc_id
+        self.entries_array.append(new_entry)
         
-        # Update history display
-        for i in self.history_tree.get_children():
-            self.history_tree.delete(i)
-
-        query=f'SELECT * FROM user_{username} ORDER BY date DESC'
-        self.cursor.execute(query)
-        rows = self.cursor.fetchall()
-
         # Insert data into the Treeview
-        for row in rows:
-            self.history_tree.insert("", tk.END, values=row)
-
-        self.generate_notifications()
+        self.history_tree.insert("", tk.END, values=tuple([data['time_created'], data['from'], data['to'], data['amount'], data['converted_amount']]))
 
     def update_graph(self):
         self.ax.clear()
@@ -298,9 +290,12 @@ class CurrencyConverter:
 
         return notifications
 
-
     def run(self):
         self.root.mainloop()
+        
+    def on_close(self):
+        self.root.destroy()
+        exit(0)
 
 if __name__ == "__main__":
     app = CurrencyConverter()
