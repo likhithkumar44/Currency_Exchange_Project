@@ -240,6 +240,8 @@ class CurrencyConverter:
         
         # Insert data into the Treeview
         self.history_tree.insert("", tk.END, values=tuple([data['time_created'], data['from'], data['to'], data['amount'], data['converted_amount']]))
+        
+        self.generate_notifications()
 
     def update_graph(self):
         self.ax.clear()
@@ -262,19 +264,12 @@ class CurrencyConverter:
         p_data=response.json()
         p_data=p_data['rates']
         p_data['USD']=1
-
-        query=f'SELECT from_currency from user_{self.username}'
-        self.cursor.execute(query)
-        cur=self.cursor.fetchall()
         arr=[]
-        for i in cur:
-            arr.append(i[0])
-        query=f'SELECT to_currency from user_{self.username}'
-        self.cursor.execute(query)
-        cur=self.cursor.fetchall()
-        for i in cur:
-            arr.append(i[0])
+        for entry in self.entries_array:
+            arr.append(entry['from'])
+            arr.append(entry['to'])
         arr=list(set(arr))
+        print(arr)
         notifications=[]
         for i in arr:
             if p_data[i]!=self.data[i]:
