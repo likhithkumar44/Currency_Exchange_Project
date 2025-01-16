@@ -277,10 +277,10 @@ class CurrencyConverter:
                 new_rate=1/self.data[i]
                 change=abs(((new_rate-old_rate)/old_rate)*100)
                 if p_data[i]<self.data[i]:
-                    temp=f'The exchange rate of {i} has decreased by {change:.2} W.R.T USD'
+                    temp=f'The exchange rate of {i} has decreased by {change:.2} W.R.T USD in this month'
                     notifications.append(temp)
                 else:
-                    temp=f'The value of {i} has increased by {change:.2} W.R.T USD'
+                    temp=f'The value of {i} has increased by {change:.2} W.R.T USD in this month'
                     notifications.append(temp)
 
         return notifications
