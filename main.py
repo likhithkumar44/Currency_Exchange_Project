@@ -135,8 +135,8 @@ class CurrencyConverter:
             elif self.user == 'INVALID_LOGIN_CREDENTIALS': 
                 messagebox.showerror("Error", "Invalid Password")
             else:
-                self.doc_ref = self.db.collection("users").document(self.user['localId']).collection('history').order_by('time_created', direction=firestore.Query.DESCENDING)
-                docs = self.doc_ref.stream()
+                self.doc_ref = self.db.collection("users").document(self.user['localId']).collection('history')
+                docs = self.doc_ref.order_by('time_created', direction=firestore.Query.DESCENDING).stream()
                 self.entries_array = [{"id": doc.id, **doc.to_dict()} for doc in docs]
                 self.show_main_application()
 
@@ -347,7 +347,7 @@ class CurrencyConverter:
         doc_id = doc_ref[1].id
         new_entry = data.copy()
         new_entry["id"] = doc_id
-        self.entries_array.append(new_entry)
+        self.entries_array.appendLeft(new_entry)
         
         # Insert data into the Treeview
         self.history_tree.insert("", tk.END, values=tuple([data['time_created'], data['from'], data['to'], data['amount'], data['converted_amount']]))
