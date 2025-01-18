@@ -347,7 +347,7 @@ class CurrencyConverter:
         doc_id = doc_ref[1].id
         new_entry = data.copy()
         new_entry["id"] = doc_id
-        self.entries_array.appendLeft(new_entry)
+        self.entries_array.insert(0, new_entry)
         
         # Insert data into the Treeview
         self.history_tree.insert("", tk.END, values=tuple([data['time_created'], data['from'], data['to'], data['amount'], data['converted_amount']]))
