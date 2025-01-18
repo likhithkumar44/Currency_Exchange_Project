@@ -261,12 +261,45 @@ class CurrencyConverter:
      self.canvas.get_tk_widget().grid(row=0, column=0, pady=5)
 
     def setup_rate_notification(self):
-        self.notification_var = tk.StringVar()
+    # Create a frame for the notification widget and scrollbar
         notification_frame = ttk.LabelFrame(self.main_frame, text="Rate Notifications", padding="10")
         notification_frame.grid(row=2, column=0, columnspan=2, padx=5, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        ttk.Label(notification_frame, textvariable=self.notification_var).grid(row=0, column=0, pady=5)
-        self.notification_var.set("No new rate alerts")
+        # Add vertical scrollbar
+        scrollbar = ttk.Scrollbar(notification_frame, orient=tk.VERTICAL)
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        
+        # Add text widget with scroll support
+        self.notification_text = tk.Text(notification_frame, wrap=tk.WORD, height=8, yscrollcommand=scrollbar.set, state=tk.DISABLED)
+        self.notification_text.grid(row=0, column=0, padx=5, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Configure the scrollbar to work with the text widget
+        scrollbar.config(command=self.notification_text.yview)
+        
+        # Set weight for resizing
+        notification_frame.rowconfigure(0, weight=1)
+        notification_frame.columnconfigure(0, weight=1)
+        
+        # Update the notification text
+        self.display_notifications()
+
+
+    def display_notifications(self):
+        # Generate notifications
+        notifications = self.generate_notifications()
+        
+        # Enable the text widget to insert content
+        self.notification_text.config(state=tk.NORMAL)
+        
+        # Clear previous content
+        self.notification_text.delete("1.0", tk.END)
+        
+        # Add each notification on a new line
+        for notification in notifications:
+            self.notification_text.insert(tk.END, f"{notification}\n")
+        
+        # Disable the text widget to make it read-only
+        self.notification_text.config(state=tk.DISABLED)
 
     def convert_currency(self):
         try:
@@ -286,6 +319,8 @@ class CurrencyConverter:
             
             # Update graph
             self.update_graph()
+
+            self.setup_rate_notification()
             
         except Exception as e:
             print(e)
@@ -344,7 +379,7 @@ class CurrencyConverter:
     # Format x-axis labels
      plt.xticks(rotation=0)  # No rotation needed for fewer currencies
 
-     self.fig.set_size_inches(5.5, 3.8)
+     self.fig.set_size_inches(4.5, 3.8)
     
     # Adjust y-axis scale to fit the data
      max_rate = max(rates)
@@ -357,6 +392,24 @@ class CurrencyConverter:
     # Remove top and right spines
      self.ax.spines['top'].set_visible(False)
      self.ax.spines['right'].set_visible(False)
+    
+    # Add value labels on top of each bar
+     for bar in bars:
+        height = bar.get_height()
+        self.ax.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{height:.2f}',
+                    ha='center', va='bottom',
+                    fontsize=9)
+    
+    # Adjust layout
+     plt.tight_layout(pad=1.2)
+    
+    # Set white background
+     self.fig.patch.set_facecolor('white')
+     self.ax.set_facecolor('white')
+    
+    # Update the canvas
+     self.canvas.draw()
     
     # Add value labels on top of each bar
      for bar in bars:
